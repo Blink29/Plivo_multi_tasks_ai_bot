@@ -1,6 +1,7 @@
 """
 Configuration constants for the AI Playground application
 """
+import os
 
 # Gemini API Configuration
 GEMINI_MODEL_NAME = "models/gemini-2.5-flash"
@@ -43,6 +44,18 @@ SESSION_QUERY_LIMIT = 10
 SESSION_TIMEOUT_HOURS = 24
 
 # API Configuration
-CORS_ORIGINS = ["http://localhost:5173"]
+# Development CORS origins
+DEV_CORS_ORIGINS = ["http://localhost:5173"]
+
+# Production CORS origins (add your Vercel domain)
+PROD_CORS_ORIGINS = [
+    "https://your-app-name.vercel.app",  # Replace with your actual Vercel URL
+    "https://*.vercel.app"
+]
+
+# Determine environment and set CORS origins
+ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
+CORS_ORIGINS = PROD_CORS_ORIGINS if ENVIRONMENT == "production" else DEV_CORS_ORIGINS
+
 API_HOST = "0.0.0.0"
-API_PORT = 8000
+API_PORT = int(os.getenv("PORT", 8000))  # Use PORT from environment or default to 8000

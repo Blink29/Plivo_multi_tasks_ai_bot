@@ -70,3 +70,20 @@ npm run dev
 - **Admin**: `admin@plivo.com` / `admin123`
 - **User**: `user@plivo.com` / `user123`
 - **Test**: `test@test.com` / `test123`
+
+## Deployment
+
+### Backend (Render)
+1. Connect your GitHub repo to Render
+2. Select the `backend` folder as root directory
+3. Use these settings:
+   - **Build Command**: `pip install -r requirements.txt`
+   - **Start Command**: `gunicorn app.main:app -w 4 -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:$PORT`
+   - **Environment**: Add `GEMINI_API_KEY` environment variable
+
+### Frontend (Vercel)
+1. Connect your GitHub repo to Vercel
+2. Select the `frontend` folder as root directory
+3. Add environment variable:
+   - **VITE_API_BASE_URL**: Your Render backend URL (e.g., `https://your-app.onrender.com`)
+4. Update `backend/app/config.py` PROD_CORS_ORIGINS with your Vercel URL

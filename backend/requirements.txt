@@ -47,3 +47,8 @@ urllib3==2.5.0
 uvicorn==0.35.0
 watchfiles==1.1.0
 websockets==15.0.1
+SpeechRecognition==3.10.0
+pyannote.audio==3.1.1
+pydub==0.25.1
+torch==2.0.1
+torchaudio==2.0.2

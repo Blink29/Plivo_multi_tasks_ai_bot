@@ -4,8 +4,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Upload, Image as ImageIcon, Loader2, Eye, FileImage } from 'lucide-react'
 import { MarkdownRenderer } from '@/components/markdown-renderer'
-
-const API_BASE_URL = 'http://localhost:8000'
+import axiosInstance from '../../axios'
 
 export function ImageAnalysis() {
   const [selectedFile, setSelectedFile] = useState(null)
@@ -57,21 +56,29 @@ export function ImageAnalysis() {
       const formData = new FormData()
       formData.append('image', selectedFile)
 
-      const response = await fetch(`${API_BASE_URL}/api/analyze-image`, {
-        method: 'POST',
-        body: formData
+      const response = await axiosInstance.post('/api/analyze-image', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
       })
 
-      if (response.ok) {
-        const data = await response.json()
-        setAnalysis(data.analysis)
-      } else {
-        const errorData = await response.json()
-        throw new Error(errorData.detail || 'Failed to analyze image')
-      }
+      setAnalysis(response.data.analysis)
     } catch (error) {
       console.error('Error analyzing image:', error)
-      setError(error.message || 'Failed to analyze image. Please try again.')
+      let errorMessage = 'Failed to analyze image. Please try again.'
+      
+      if (error.response) {
+        // Server responded with error status
+        errorMessage = error.response.data?.detail || error.response.statusText || errorMessage
+      } else if (error.request) {
+        // Request was made but no response received
+        errorMessage = 'Unable to connect to the server. Please check if the backend is running.'
+      } else {
+        // Something else happened
+        errorMessage = error.message || errorMessage
+      }
+      
+      setError(errorMessage)
     } finally {
       setIsAnalyzing(false)
     }

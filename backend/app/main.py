@@ -9,16 +9,19 @@ from contextlib import asynccontextmanager
 from app.services.gemini_service import GeminiService
 from app.services.session_manager import SessionManager
 from app.services.image_analysis_service import ImageAnalysisService
+from app.services.document_summarization_service import DocumentSummarizationService
+from app.config import CORS_ORIGINS, API_HOST, API_PORT, MAX_IMAGE_SIZE, MAX_DOCUMENT_SIZE
 
 # Global instances
 session_manager = SessionManager()
 gemini_service = None
 image_analysis_service = None
+document_summarization_service = None
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
-    global gemini_service, image_analysis_service
+    global gemini_service, image_analysis_service, document_summarization_service
     try:
         gemini_service = GeminiService()
         print("✅ Gemini service initialized successfully")
@@ -31,6 +34,12 @@ async def lifespan(app: FastAPI):
         print("✅ Image analysis service initialized successfully")
     except Exception as e:
         print(f"❌ Failed to initialize Image analysis service: {e}")
+    
+    try:
+        document_summarization_service = DocumentSummarizationService()
+        print("✅ Document summarization service initialized successfully")
+    except Exception as e:
+        print(f"❌ Failed to initialize Document summarization service: {e}")
     
     # Start background task for session cleanup
     cleanup_task = asyncio.create_task(cleanup_sessions_periodically())
@@ -64,7 +73,7 @@ app = FastAPI(
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],  # React dev server
+    allow_origins=CORS_ORIGINS,  # React dev server
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -87,6 +96,15 @@ class ImageAnalysisResponse(BaseModel):
     analysis: str
     filename: str
     file_size: int
+
+class DocumentSummarizationResponse(BaseModel):
+    summary: str
+    filename: Optional[str] = None
+    url: Optional[str] = None
+    file_size: Optional[int] = None
+
+class URLSummarizationRequest(BaseModel):
+    url: str
 
 @app.get("/")
 async def root():
@@ -201,10 +219,10 @@ async def analyze_image(image: UploadFile = File(...)):
             )
         
         # Validate file size (max 10MB)
-        if image.size and image.size > 10 * 1024 * 1024:
+        if image.size and image.size > MAX_IMAGE_SIZE:
             raise HTTPException(
                 status_code=400,
-                detail="File size must be less than 10MB"
+                detail=f"File size must be less than {MAX_IMAGE_SIZE // (1024*1024)}MB"
             )
         
         # Read image data
@@ -237,20 +255,126 @@ async def analyze_image(image: UploadFile = File(...)):
             detail=f"Error analyzing image: {str(e)}"
         )
 
+@app.post("/api/summarize-document", response_model=DocumentSummarizationResponse)
+async def summarize_document(document: UploadFile = File(...)):
+    """
+    Summarize an uploaded document using Gemini API
+    """
+    try:
+        if not document_summarization_service:
+            raise HTTPException(
+                status_code=503,
+                detail="Document summarization service not available. Please check configuration."
+            )
+        
+        # Validate file type
+        supported_extensions = document_summarization_service.get_supported_file_extensions()
+        file_extension = '.' + document.filename.split('.')[-1].lower() if document.filename else ''
+        
+        if file_extension not in supported_extensions:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unsupported file type. Supported formats: {', '.join(supported_extensions)}"
+            )
+        
+        # Validate file size (max 50MB)
+        if document.size and document.size > MAX_DOCUMENT_SIZE:
+            raise HTTPException(
+                status_code=400,
+                detail=f"File size must be less than {MAX_DOCUMENT_SIZE // (1024*1024)}MB"
+            )
+        
+        # Read document data
+        document_data = await document.read()
+        
+        if not document_data:
+            raise HTTPException(
+                status_code=400,
+                detail="Empty file received"
+            )
+        
+        # Detect MIME type
+        mime_type = document_summarization_service.detect_mime_type_from_filename(document.filename or "")
+        
+        # Summarize document
+        summary = document_summarization_service.summarize_document(
+            file_data=document_data,
+            mime_type=mime_type
+        )
+        
+        return DocumentSummarizationResponse(
+            summary=summary,
+            filename=document.filename or "unknown",
+            file_size=len(document_data)
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Document summarization error: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error summarizing document: {str(e)}"
+        )
+
+@app.post("/api/summarize-document-url", response_model=DocumentSummarizationResponse)
+async def summarize_document_url(request: URLSummarizationRequest):
+    """
+    Summarize a document from URL using Gemini API
+    """
+    try:
+        if not document_summarization_service:
+            raise HTTPException(
+                status_code=503,
+                detail="Document summarization service not available. Please check configuration."
+            )
+        
+        # Basic URL validation
+        if not request.url.strip():
+            raise HTTPException(
+                status_code=400,
+                detail="URL is required"
+            )
+        
+        # Detect MIME type from URL
+        mime_type = document_summarization_service.detect_mime_type_from_filename(request.url)
+        
+        # Summarize document from URL
+        summary = document_summarization_service.summarize_document(
+            file_url=request.url.strip(),
+            mime_type=mime_type
+        )
+        
+        return DocumentSummarizationResponse(
+            summary=summary,
+            url=request.url.strip()
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"URL summarization error: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error summarizing document from URL: {str(e)}"
+        )
+
 @app.get("/health")
 async def health_check():
     gemini_status = "available" if gemini_service else "unavailable"
     image_analysis_status = "available" if image_analysis_service else "unavailable"
+    document_summarization_status = "available" if document_summarization_service else "unavailable"
     return {
         "status": "healthy",
         "message": "AI Playground API is running",
         "services": {
             "gemini_service": gemini_status,
-            "image_analysis_service": image_analysis_status
+            "image_analysis_service": image_analysis_status,
+            "document_summarization_service": document_summarization_status
         },
         "active_sessions": len(session_manager.sessions)
     }
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host=API_HOST, port=API_PORT)

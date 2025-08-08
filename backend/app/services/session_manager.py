@@ -2,12 +2,13 @@ from typing import Dict, List
 import uuid
 import time
 from datetime import datetime, timedelta
+from app.config import SESSION_QUERY_LIMIT, SESSION_TIMEOUT_HOURS
 
 class SessionManager:
     def __init__(self):
         # In-memory storage for sessions (in production, use Redis or database)
         self.sessions: Dict[str, Dict] = {}
-        self.session_timeout = 3600  # 1 hour timeout
+        self.session_timeout = SESSION_TIMEOUT_HOURS * 3600  # Convert hours to seconds
         
     def create_session(self) -> str:
         """Create a new session and return session ID"""
@@ -17,7 +18,7 @@ class SessionManager:
             'last_activity': datetime.now(),
             'messages': [],
             'query_count': 0,
-            'max_queries': 5
+            'max_queries': SESSION_QUERY_LIMIT
         }
         return session_id
     

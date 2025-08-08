@@ -2,6 +2,7 @@ import os
 from google import genai
 from typing import List, Dict
 from dotenv import load_dotenv
+from app.config import GEMINI_MODEL_NAME
 
 # Load environment variables
 load_dotenv()
@@ -28,7 +29,7 @@ class GeminiService:
             
             # Generate response using the new API
             response = self.client.models.generate_content(
-                model="models/gemini-2.5-flash",
+                model=GEMINI_MODEL_NAME,
                 contents=prompt
             )
             

@@ -4,14 +4,12 @@ from google.genai import types
 from typing import List, Dict
 from dotenv import load_dotenv
 import base64
+from app.config import GEMINI_MODEL_NAME, SUPPORTED_IMAGE_TYPES
 
 # Load environment variables
 load_dotenv()
 
 class ImageAnalysisService:
-    # Model configuration
-    MODEL_NAME = "models/gemini-2.5-flash"
-    
     def __init__(self):
         self.api_key = os.getenv("GEMINI_API_KEY")
         if not self.api_key:
@@ -29,7 +27,7 @@ class ImageAnalysisService:
         """
         try:
             response = self.client.models.generate_content(
-                model=self.MODEL_NAME,
+                model=GEMINI_MODEL_NAME,
                 contents=[
                     types.Part.from_bytes(
                         data=image_data,
@@ -72,10 +70,4 @@ Please format your response with clear sections using markdown headers."""
         """
         Get list of supported image MIME types
         """
-        return [
-            "image/jpeg",
-            "image/jpg", 
-            "image/png",
-            "image/gif",
-            "image/webp"
-        ]
+        return SUPPORTED_IMAGE_TYPES

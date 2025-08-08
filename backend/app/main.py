@@ -6,28 +6,18 @@ from typing import Optional
 import asyncio
 from contextlib import asynccontextmanager
 
-from app.services.gemini_service import GeminiService
-from app.services.session_manager import SessionManager
 from app.services.image_analysis_service import ImageAnalysisService
 from app.services.document_summarization_service import DocumentSummarizationService
 from app.config import CORS_ORIGINS, API_HOST, API_PORT, MAX_IMAGE_SIZE, MAX_DOCUMENT_SIZE
 
 # Global instances
-session_manager = SessionManager()
-gemini_service = None
 image_analysis_service = None
 document_summarization_service = None
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
-    global gemini_service, image_analysis_service, document_summarization_service
-    try:
-        gemini_service = GeminiService()
-        print("✅ Gemini service initialized successfully")
-    except Exception as e:
-        print(f"❌ Failed to initialize Gemini service: {e}")
-        print("💡 Make sure to add your GEMINI_API_KEY to the .env file")
+    global image_analysis_service, document_summarization_service
     
     try:
         image_analysis_service = ImageAnalysisService()
@@ -41,27 +31,9 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f"❌ Failed to initialize Document summarization service: {e}")
     
-    # Start background task for session cleanup
-    cleanup_task = asyncio.create_task(cleanup_sessions_periodically())
-    
     yield
     
-    # Shutdown
-    cleanup_task.cancel()
-
-async def cleanup_sessions_periodically():
-    """Background task to cleanup expired sessions"""
-    while True:
-        try:
-            cleaned = session_manager.cleanup_expired_sessions()
-            if cleaned > 0:
-                print(f"🧹 Cleaned up {cleaned} expired sessions")
-            await asyncio.sleep(300)  # Cleanup every 5 minutes
-        except asyncio.CancelledError:
-            break
-        except Exception as e:
-            print(f"Error in session cleanup: {e}")
-            await asyncio.sleep(300)
+    # Shutdown (no cleanup needed without session manager)
 
 app = FastAPI(
     title="AI Playground API", 
@@ -78,19 +50,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-class ChatRequest(BaseModel):
-    message: str
-    session_id: Optional[str] = None
-
-class ChatResponse(BaseModel):
-    response: str
-    session_id: str
-    remaining_queries: int
-
-class SessionResponse(BaseModel):
-    session_id: str
-    remaining_queries: int
 
 class ImageAnalysisResponse(BaseModel):
     analysis: str
@@ -109,94 +68,14 @@ class URLSummarizationRequest(BaseModel):
 @app.get("/")
 async def root():
     return {
-        "message": "AskMe Bot API is running!",
+        "message": "AI Playground API is running!",
         "version": "1.0.0",
         "endpoints": {
-            "chat": "/api/chat",
-            "new_session": "/api/session/new",
+            "image_analysis": "/api/analyze-image",
+            "document_summarization": "/api/summarize-document",
+            "document_url_summarization": "/api/summarize-document-url",
             "health": "/health"
         }
-    }
-
-@app.post("/api/session/new", response_model=SessionResponse)
-async def create_new_session():
-    """Create a new chat session"""
-    session_id = session_manager.create_session()
-    remaining_queries = session_manager.get_remaining_queries(session_id)
-    
-    return SessionResponse(
-        session_id=session_id,
-        remaining_queries=remaining_queries
-    )
-
-@app.post("/api/chat", response_model=ChatResponse)
-async def chat(request: ChatRequest, background_tasks: BackgroundTasks):
-    """
-    Chat endpoint with Gemini API integration and session management
-    """
-    try:
-        if not gemini_service:
-            raise HTTPException(
-                status_code=503, 
-                detail="Gemini service not available. Please check API key configuration."
-            )
-        
-        # Get or create session
-        session_id = request.session_id
-        if not session_id or not session_manager.get_session(session_id):
-            session_id = session_manager.create_session()
-        
-        # Check if session can make more queries
-        if not session_manager.can_make_query(session_id):
-            raise HTTPException(
-                status_code=429,
-                detail="Query limit reached for this session. Please start a new session."
-            )
-        
-        user_message = request.message.strip()
-        if not user_message:
-            raise HTTPException(status_code=400, detail="Message cannot be empty")
-        
-        # Add user message to session
-        session_manager.add_message_to_session(session_id, user_message, is_user=True)
-        
-        # Get conversation history for context
-        conversation_history = session_manager.get_conversation_history(session_id)
-        
-        # Generate response with Gemini
-        bot_response = gemini_service.generate_response(
-            message=user_message,
-            conversation_history=conversation_history[:-1]  # Exclude the current message
-        )
-        
-        # Add bot response to session
-        session_manager.add_message_to_session(session_id, bot_response, is_user=False)
-        
-        # Get remaining queries
-        remaining_queries = session_manager.get_remaining_queries(session_id)
-        
-        return ChatResponse(
-            response=bot_response,
-            session_id=session_id,
-            remaining_queries=remaining_queries
-        )
-    
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"Chat error: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error processing request: {str(e)}")
-
-@app.get("/api/session/{session_id}/history")
-async def get_session_history(session_id: str):
-    """Get conversation history for a session"""
-    history = session_manager.get_conversation_history(session_id)
-    remaining_queries = session_manager.get_remaining_queries(session_id)
-    
-    return {
-        "session_id": session_id,
-        "history": history,
-        "remaining_queries": remaining_queries
     }
 
 @app.post("/api/analyze-image", response_model=ImageAnalysisResponse)
@@ -361,18 +240,15 @@ async def summarize_document_url(request: URLSummarizationRequest):
 
 @app.get("/health")
 async def health_check():
-    gemini_status = "available" if gemini_service else "unavailable"
     image_analysis_status = "available" if image_analysis_service else "unavailable"
     document_summarization_status = "available" if document_summarization_service else "unavailable"
     return {
         "status": "healthy",
         "message": "AI Playground API is running",
         "services": {
-            "gemini_service": gemini_status,
             "image_analysis_service": image_analysis_status,
             "document_summarization_service": document_summarization_status
-        },
-        "active_sessions": len(session_manager.sessions)
+        }
     }
 
 if __name__ == "__main__":

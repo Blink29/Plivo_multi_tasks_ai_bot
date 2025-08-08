@@ -3,7 +3,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ImageAnalysis } from '@/components/skills/image-analysis'
 import { ConversationAnalysis } from '@/components/skills/conversation-analysis'
 import { DocumentSummarization } from '@/components/skills/document-summarization'
-import { ThemeToggle } from '@/components/theme-toggle'
 import { Brain, Image, FileText, MessageSquare } from 'lucide-react'
 
 const SKILLS = [
@@ -42,17 +41,8 @@ export function SkillSelector() {
 
   return (
     <div className="max-w-4xl mx-auto p-6 space-y-6">
-      {/* Header */}
+      {/* Description */}
       <div className="text-center space-y-2">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <Brain className="w-8 h-8 text-primary" />
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
-              AI Playground
-            </h1>
-          </div>
-          <ThemeToggle />
-        </div>
         <p className="text-muted-foreground max-w-2xl mx-auto">
           Select an AI skill below to explore multi-modal capabilities including image analysis, 
           conversation processing, and document summarization.

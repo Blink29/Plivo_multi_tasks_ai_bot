@@ -50,8 +50,7 @@ DEV_CORS_ORIGINS = ["http://localhost:5173"]
 # Production CORS origins (add your Vercel domain)
 PROD_CORS_ORIGINS = [
     "https://plivo-multi-tasks-ai-bot.vercel.app",  # Your main Vercel domain
-    "https://plivo-multi-tasks-ai-j967msym8-blink29s-projects.vercel.app",  # Your old deployment URL
-    "https://plivo-multi-tasks-ai-c5n9eh47m-blink29s-projects.vercel.app",  # Your new deployment URL
+    "https://*-blink29s-projects.vercel.app",  # All your project deployments
     "https://*.vercel.app"  # Wildcard for all Vercel subdomains
 ]
 

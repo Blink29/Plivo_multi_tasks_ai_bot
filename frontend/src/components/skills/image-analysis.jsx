@@ -62,19 +62,26 @@ export function ImageAnalysis() {
         },
       })
 
+      console.log('🔍 Image Analysis Response:', response.data); // Debug log
       setAnalysis(response.data.analysis)
     } catch (error) {
-      console.error('Error analyzing image:', error)
+      console.error('❌ Error analyzing image:', error)
+      console.error('❌ Error response:', error.response)
+      console.error('❌ Error request:', error.request)
+      
       let errorMessage = 'Failed to analyze image. Please try again.'
       
       if (error.response) {
         // Server responded with error status
+        console.log('📍 Server error response:', error.response.status, error.response.data)
         errorMessage = error.response.data?.detail || error.response.statusText || errorMessage
       } else if (error.request) {
         // Request was made but no response received
+        console.log('📍 No response received:', error.request)
         errorMessage = 'Unable to connect to the server. Please check if the backend is running.'
       } else {
         // Something else happened
+        console.log('📍 Other error:', error.message)
         errorMessage = error.message || errorMessage
       }
       

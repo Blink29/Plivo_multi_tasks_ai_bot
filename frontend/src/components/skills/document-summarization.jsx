@@ -129,20 +129,27 @@ export function DocumentSummarization() {
           url: url.trim()
         });
 
+        console.log('🔍 Document Summary Response:', response.data); // Debug log
         setResult(response.data.summary);
       }
     } catch (err) {
-      console.error('Error summarizing document:', err);
+      console.error('❌ Error summarizing document:', err);
+      console.error('❌ Error response:', err.response);
+      console.error('❌ Error request:', err.request);
+      
       let errorMessage = 'An error occurred while summarizing the document';
       
       if (err.response) {
         // Server responded with error status
+        console.log('📍 Server error response:', err.response.status, err.response.data);
         errorMessage = err.response.data?.detail || err.response.statusText || errorMessage;
       } else if (err.request) {
         // Request was made but no response received
+        console.log('📍 No response received:', err.request);
         errorMessage = 'Unable to connect to the server. Please check if the backend is running.';
       } else {
         // Something else happened
+        console.log('📍 Other error:', err.message);
         errorMessage = err.message || errorMessage;
       }
       
